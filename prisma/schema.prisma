@@ -1,0 +1,112 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  clerkId       String         @unique
+  email         String         @unique
+  role          UserRole       @default(FREE_TIER)
+  stripeCustomerId String?     @unique
+  tenantId      String?
+  tenant        Tenant?        @relation(fields: [tenantId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  apiKeys       ApiKey[]
+
+  @@index([clerkId])
+  @@index([email])
+}
+
+model Tenant {
+  id            String         @id @default(cuid())
+  name          String
+  assets        Asset[]
+  users         User[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Asset {
+  id              String           @id @default(cuid())
+  name            String
+  type            AssetType
+  ipAddress       String?
+  domain          String?
+  tenantId        String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vulnerabilities Vulnerability[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([tenantId])
+}
+
+model Vulnerability {
+  id          String             @id @default(cuid())
+  title       String
+  description String
+  severity    VulnerabilitySeverity
+  cvssScore   Float?
+  status      VulnerabilityStatus @default(OPEN)
+  assetId     String
+  asset       Asset              @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  discoveredAt DateTime          @default(now())
+  resolvedAt   DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([assetId])
+  @@index([severity])
+  @@index([status])
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  name      String
+  key       String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastUsed  DateTime?
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  @@index([userId])
+}
+
+enum UserRole {
+  FREE_TIER
+  PRO_AUDITOR
+}
+
+enum AssetType {
+  WEB_APPLICATION
+  MOBILE_APP
+  API
+  CLOUD_INFRASTRUCTURE
+  NETWORK_DEVICE
+  DATABASE
+}
+
+enum VulnerabilitySeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFORMATIONAL
+}
+
+enum VulnerabilityStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  FALSE_POSITIVE
+}
